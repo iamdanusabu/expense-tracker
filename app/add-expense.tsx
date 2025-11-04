@@ -37,12 +37,6 @@ export default function AddExpenseScreen() {
       return;
     }
 
-    // Validate description
-    if (!description.trim()) {
-      Alert.alert('No Description', 'Please enter a description.');
-      return;
-    }
-
     // Add the expense
     addExpense({
       amount: parsedAmount,

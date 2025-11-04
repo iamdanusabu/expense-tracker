@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { Card, Title, List, IconButton, TextInput, Button, FAB } from 'react-native-paper';
+import { Card, Title, List, IconButton, TextInput, Button, FAB, Dialog, Portal } from 'react-native-paper';
 import { useExpenses } from '../contexts/ExpenseContext';
 
 /**
@@ -9,15 +9,21 @@ import { useExpenses } from '../contexts/ExpenseContext';
  * - View all expense categories
  * - Add new categories
  * - Delete existing categories
+ * - Set a budget for each category
  * Each category has a name and color
  */
 export default function CategoriesScreen() {
-  const { categories, addCategory, deleteCategory } = useExpenses();
+  const { categories, addCategory, deleteCategory, setCategoryBudget } = useExpenses();
 
   // State for adding new category
   const [showAddForm, setShowAddForm] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [selectedColor, setSelectedColor] = useState('#FF6B6B');
+
+  // State for setting category budget
+  const [budgetDialogVisible, setBudgetDialogVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<{ id: string; name: string; budget?: number } | null>(null);
+  const [budgetInput, setBudgetInput] = useState('');
 
   // Predefined color palette for categories
   const colorPalette = [
@@ -68,6 +74,34 @@ export default function CategoriesScreen() {
       ]
     );
   };
+  
+  // Show the dialog to set category budget
+  const showBudgetDialog = (category: { id: string; name: string; budget?: number }) => {
+    setSelectedCategory(category);
+    setBudgetInput(category.budget ? String(category.budget) : '');
+    setBudgetDialogVisible(true);
+  };
+
+  // Hide the dialog
+  const hideBudgetDialog = () => {
+    setBudgetDialogVisible(false);
+    setSelectedCategory(null);
+    setBudgetInput('');
+  };
+
+  // Handle setting the category budget
+  const handleSetCategoryBudget = () => {
+    if (selectedCategory) {
+      const budgetValue = parseFloat(budgetInput);
+      if (!isNaN(budgetValue) && budgetValue >= 0) {
+        setCategoryBudget(selectedCategory.id, budgetValue);
+        hideBudgetDialog();
+        Alert.alert('Success', `Budget for ${selectedCategory.name} has been set.`);
+      } else {
+        Alert.alert('Invalid Budget', 'Please enter a valid non-negative number for the budget.');
+      }
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -82,6 +116,7 @@ export default function CategoriesScreen() {
                   <List.Item
                     key={category.id}
                     title={category.name}
+                    description={category.budget ? `Budget: $${category.budget.toFixed(2)}` : 'No budget set'}
                     left={() => (
                       <View 
                         style={[
@@ -91,11 +126,18 @@ export default function CategoriesScreen() {
                       />
                     )}
                     right={() => (
-                      <IconButton
-                        icon="delete"
-                        size={20}
-                        onPress={() => handleDeleteCategory(category.id, category.name)}
-                      />
+                      <View style={{flexDirection: 'row'}}>
+                        <IconButton
+                          icon="cash-plus"
+                          size={20}
+                          onPress={() => showBudgetDialog(category)}
+                        />
+                        <IconButton
+                          icon="delete"
+                          size={20}
+                          onPress={() => handleDeleteCategory(category.id, category.name)}
+                        />
+                      </View>
                     )}
                   />
                 ))}
@@ -175,6 +217,26 @@ export default function CategoriesScreen() {
           label="Add Category"
         />
       )}
+
+      {/* Set Category Budget Dialog */}
+      <Portal>
+        <Dialog visible={budgetDialogVisible} onDismiss={hideBudgetDialog}>
+          <Dialog.Title>Set Budget for {selectedCategory?.name}</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Budget Amount"
+              value={budgetInput}
+              onChangeText={setBudgetInput}
+              keyboardType="numeric"
+              mode="outlined"
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={hideBudgetDialog}>Cancel</Button>
+            <Button onPress={handleSetCategoryBudget}>Set Budget</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }

@@ -6,6 +6,7 @@ export interface Category {
   id: string;
   name: string;
   color: string;
+  budget?: number;
 }
 
 export interface Expense {
@@ -25,7 +26,8 @@ interface ExpenseContextType {
   categories: Category[];
   addCategory: (name: string, color: string) => void;
   deleteCategory: (id: string) => void;
-  
+  setCategoryBudget: (categoryId: string, budget: number) => void;
+
   // Expenses
   expenses: Expense[];
   addExpense: (expense: Omit<Expense, 'id'>) => void;
@@ -34,12 +36,12 @@ interface ExpenseContextType {
   // Computed values (Total across all time)
   totalSpent: number;
   remainingBalance: number;
-  categoryWiseSummary: { [key: string]: number };
+  categoryWiseSummary: { [key: string]: { spent: number; budget?: number; remaining?: number } };
   
   // Helper functions for filtering by month
   getExpensesForMonth: (year: number, month: number) => Expense[];
   getMonthlySpent: (year: number, month: number) => number;
-  getMonthlyCategoryWiseSummary: (year: number, month: number) => { [key: string]: number };
+  getMonthlyCategoryWiseSummary: (year: number, month: number) => { [key: string]: { spent: number; budget?: number; remaining?: number } };
   getAvailableMonths: () => string[];
 }
 
@@ -118,6 +120,15 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setBudget = (amount: number) => {
     setBudgetState(amount);
   };
+  
+  // Set the category budget
+  const setCategoryBudget = (categoryId: string, budget: number) => {
+    setCategoriesState(prevCategories =>
+      prevCategories.map(category =>
+        category.id === categoryId ? { ...category, budget } : category
+      )
+    );
+  };
 
   // Add a new category
   const addCategory = (name: string, color: string) => {
@@ -155,10 +166,24 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const remainingBalance = budget - totalSpent;
 
   // Calculate category-wise summary of expenses (total across all time)
-  const categoryWiseSummary = expenses.reduce((summary, expense) => {
-    summary[expense.category] = (summary[expense.category] || 0) + expense.amount;
-    return summary;
-  }, {} as { [key: string]: number });
+    const categoryWiseSummary = expenses.reduce((summary, expense) => {
+        const category = categories.find(c => c.id === expense.category);
+        if (category) {
+            const spent = (summary[expense.category]?.spent || 0) + expense.amount;
+            const budget = category.budget;
+            const remaining = budget !== undefined ? budget - spent : undefined;
+            summary[expense.category] = { spent, budget, remaining };
+        }
+        return summary;
+    }, {} as { [key: string]: { spent: number; budget?: number; remaining?: number } });
+
+    categories.forEach(category => {
+        if (!categoryWiseSummary[category.id]) {
+            const budget = category.budget;
+            const remaining = budget !== undefined ? budget : undefined;
+            categoryWiseSummary[category.id] = { spent: 0, budget, remaining };
+        }
+    });
 
   // Get expenses for a specific month
   const getExpensesForMonth = (year: number, month: number): Expense[] => {
@@ -175,13 +200,30 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Get category-wise summary for a specific month
-  const getMonthlyCategoryWiseSummary = (year: number, month: number): { [key: string]: number } => {
-    const monthExpenses = getExpensesForMonth(year, month);
-    return monthExpenses.reduce((summary, expense) => {
-      summary[expense.category] = (summary[expense.category] || 0) + expense.amount;
-      return summary;
-    }, {} as { [key: string]: number });
-  };
+    const getMonthlyCategoryWiseSummary = (year: number, month: number): { [key: string]: { spent: number; budget?: number; remaining?: number } } => {
+        const monthExpenses = getExpensesForMonth(year, month);
+        const summary = monthExpenses.reduce((summary, expense) => {
+            const category = categories.find(c => c.id === expense.category);
+            if (category) {
+                const spent = (summary[expense.category]?.spent || 0) + expense.amount;
+                const budget = category.budget;
+                const remaining = budget !== undefined ? budget - spent : undefined;
+                summary[expense.category] = { spent, budget, remaining };
+            }
+            return summary;
+        }, {} as { [key: string]: { spent: number; budget?: number; remaining?: number } });
+        
+        categories.forEach(category => {
+            if (!summary[category.id]) {
+                const budget = category.budget;
+                const remaining = budget !== undefined ? budget : undefined;
+                summary[category.id] = { spent: 0, budget, remaining };
+            }
+        });
+
+        return summary;
+    };
+
 
   // Get list of all months that have expenses (formatted as "YYYY-MM")
   const getAvailableMonths = (): string[] => {
@@ -200,6 +242,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     categories,
     addCategory,
     deleteCategory,
+    setCategoryBudget,
     expenses,
     addExpense,
     deleteExpense,

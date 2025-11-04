@@ -157,14 +157,21 @@ export default function HomeScreen() {
         {/* Category-wise Summary Card */}
         <Card style={styles.card}>
           <Card.Content>
-            <Title>Expenses by Category</Title>
+            <Title>Category Budgets & Expenses</Title>
             {Object.keys(displayCategorySummary).length > 0 ? (
               <List.Section>
-                {Object.entries(displayCategorySummary).map(([categoryId, amount]) => (
+                {Object.entries(displayCategorySummary).map(([categoryId, summary]) => (
                   <List.Item
                     key={categoryId}
                     title={getCategoryName(categoryId)}
-                    description={`₹${amount.toFixed(2)}`}
+                    description={`Spent: ₹${(summary.spent || 0).toFixed(2)}${summary.budget ? ` / Budget: ₹${summary.budget.toFixed(2)}` : ''}`}
+                    right={() => (
+                      summary.remaining !== undefined ? (
+                        <Paragraph style={summary.remaining >= 0 ? styles.positive : styles.negative}>
+                          {`₹${summary.remaining.toFixed(2)}`}
+                        </Paragraph>
+                      ) : null
+                    )}
                     left={() => (
                       <View 
                         style={[
