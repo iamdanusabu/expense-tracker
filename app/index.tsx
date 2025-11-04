@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import { Card, Title, Paragraph, Button, List, FAB, Chip, Portal, Dialog } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useExpenses } from '../contexts/ExpenseContext';
@@ -20,6 +20,7 @@ export default function HomeScreen() {
     remainingBalance, 
     categoryWiseSummary,
     categories,
+    expenses,
     getAvailableMonths,
     getMonthlySpent,
     getMonthlyCategoryWiseSummary,
@@ -33,9 +34,28 @@ export default function HomeScreen() {
   
   // State for month selector dialog
   const [showMonthSelector, setShowMonthSelector] = useState(false);
+  
+  // State for pull-to-refresh
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Log values for debugging
+  useEffect(() => {
+    console.log('Home Screen - Budget:', budget);
+    console.log('Home Screen - Total Spent:', totalSpent);
+    console.log('Home Screen - Expenses count:', expenses.length);
+  }, [budget, totalSpent, expenses]);
 
   // Determine if budget is set
   const hasBudget = budget > 0;
+  
+  // Handle refresh
+  const onRefresh = () => {
+    setRefreshing(true);
+    // Force re-render by toggling a state
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 500);
+  };
 
   // Get category name by ID
   const getCategoryName = (categoryId: string) => {
@@ -82,7 +102,12 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        style={styles.scrollView}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Month Selector Chip */}
         <View style={styles.chipContainer}>
           <Chip 
