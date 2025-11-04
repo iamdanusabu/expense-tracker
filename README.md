@@ -1,50 +1,95 @@
-# Welcome to your Expo app 👋
+# Expense Tracker - React Native App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A simple and beginner-friendly mobile expense tracking application built with Expo and React Native.
 
-## Get started
+## Features
 
-1. Install dependencies
+- 📊 **Budget Management**: Set a monthly budget and track your spending
+- 💰 **Expense Tracking**: Add daily expenses with amount, category, description, and date
+- 🏷️ **Category Management**: Create and manage custom expense categories with colors
+- 📈 **Real-time Overview**: See total spent, remaining balance, and category-wise summaries
+- 💾 **Local Storage**: All data saved locally using AsyncStorage (no internet required)
 
+## Screens
+
+1. **Home Screen** - View budget overview and category-wise expense summary
+2. **Add Expense** - Add new expenses with all details
+3. **Categories** - Manage your expense categories
+4. **Settings** - Set monthly budget and manage all expenses
+
+## Tech Stack
+
+- **Expo SDK 54** - Cross-platform mobile framework
+- **React Native** - Native mobile UI
+- **TypeScript** - Type-safe code
+- **React Native Paper** - Material Design UI components
+- **AsyncStorage** - Local data persistence
+- **Expo Router** - File-based navigation
+
+## Getting Started
+
+1. Install dependencies (if needed):
    ```bash
    npm install
    ```
 
-2. Start the app
-
+2. Start the development server:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+3. Open the app:
+   - Scan the QR code with **Expo Go** app (Android/iOS)
+   - Press **w** to open in web browser
+   - Press **a** to open in Android emulator
+   - Press **i** to open in iOS simulator
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Project Structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+├── app/                    # Screen components (file-based routing)
+│   ├── _layout.tsx        # Root layout with providers
+│   ├── index.tsx          # Home screen
+│   ├── add-expense.tsx    # Add expense screen
+│   ├── categories.tsx     # Categories management
+│   └── settings.tsx       # Settings and budget
+├── contexts/              # React Context for state management
+│   └── ExpenseContext.tsx # Global state and AsyncStorage logic
+└── assets/                # Images, fonts, etc.
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## How to Use
 
-## Learn more
+1. **Set Your Budget**: Go to Settings and enter your monthly budget
+2. **Create Categories**: Visit Categories screen to add custom expense categories
+3. **Add Expenses**: Tap the + button on Home screen to add a new expense
+4. **Track Spending**: View your budget overview and category summaries on Home screen
+5. **Manage Data**: Go to Settings to view all expenses and delete if needed
 
-To learn more about developing your project with Expo, look at the following resources:
+## Key Learning Points
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+This app demonstrates:
+- React Context API for global state management
+- AsyncStorage for data persistence
+- React Navigation with Expo Router
+- Form handling and validation
+- TypeScript interfaces and type safety
+- React Native Paper UI components
+- Hooks (useState, useEffect, useContext)
 
-## Join the community
+## Expand and Customize
 
-Join our community of developers creating universal apps.
+You can easily extend this app with:
+- Monthly/weekly expense views
+- Charts and graphs for spending visualization
+- Export data to CSV
+- Recurring expenses
+- Multiple budget periods
+- Cloud sync with backend service
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Learn More
+
+- [Expo Documentation](https://docs.expo.dev/)
+- [React Native Paper](https://callstack.github.io/react-native-paper/)
+- [AsyncStorage](https://react-native-async-storage.github.io/async-storage/)
+- [TypeScript](https://www.typescriptlang.org/)
