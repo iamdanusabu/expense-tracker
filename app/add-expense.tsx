@@ -51,10 +51,8 @@ export default function AddExpenseScreen() {
       date,
     });
 
-    // Show success message and go back
-    Alert.alert('Success', 'Expense added successfully!', [
-      { text: 'OK', onPress: () => router.back() }
-    ]);
+    // Close modal immediately after adding expense
+    router.back();
   };
 
   return (
@@ -65,13 +63,13 @@ export default function AddExpenseScreen() {
 
           {/* Amount Input */}
           <TextInput
-            label="Amount ($)"
+            label="Amount (₹)"
             value={amount}
             onChangeText={setAmount}
             keyboardType="decimal-pad"
             mode="outlined"
             style={styles.input}
-            left={<TextInput.Icon icon="currency-usd" />}
+            left={<TextInput.Icon icon="currency-inr" />}
           />
 
           {/* Description Input */}

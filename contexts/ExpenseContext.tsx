@@ -31,10 +31,16 @@ interface ExpenseContextType {
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   deleteExpense: (id: string) => void;
   
-  // Computed values
+  // Computed values (Total across all time)
   totalSpent: number;
   remainingBalance: number;
   categoryWiseSummary: { [key: string]: number };
+  
+  // Helper functions for filtering by month
+  getExpensesForMonth: (year: number, month: number) => Expense[];
+  getMonthlySpent: (year: number, month: number) => number;
+  getMonthlyCategoryWiseSummary: (year: number, month: number) => { [key: string]: number };
+  getAvailableMonths: () => string[];
 }
 
 // Create the context
@@ -148,11 +154,45 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Calculate remaining balance
   const remainingBalance = budget - totalSpent;
 
-  // Calculate category-wise summary of expenses
+  // Calculate category-wise summary of expenses (total across all time)
   const categoryWiseSummary = expenses.reduce((summary, expense) => {
     summary[expense.category] = (summary[expense.category] || 0) + expense.amount;
     return summary;
   }, {} as { [key: string]: number });
+
+  // Get expenses for a specific month
+  const getExpensesForMonth = (year: number, month: number): Expense[] => {
+    return expenses.filter(expense => {
+      const expenseDate = new Date(expense.date);
+      return expenseDate.getFullYear() === year && expenseDate.getMonth() === month;
+    });
+  };
+
+  // Get total spent for a specific month
+  const getMonthlySpent = (year: number, month: number): number => {
+    const monthExpenses = getExpensesForMonth(year, month);
+    return monthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  };
+
+  // Get category-wise summary for a specific month
+  const getMonthlyCategoryWiseSummary = (year: number, month: number): { [key: string]: number } => {
+    const monthExpenses = getExpensesForMonth(year, month);
+    return monthExpenses.reduce((summary, expense) => {
+      summary[expense.category] = (summary[expense.category] || 0) + expense.amount;
+      return summary;
+    }, {} as { [key: string]: number });
+  };
+
+  // Get list of all months that have expenses (formatted as "YYYY-MM")
+  const getAvailableMonths = (): string[] => {
+    const monthSet = new Set<string>();
+    expenses.forEach(expense => {
+      const date = new Date(expense.date);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      monthSet.add(monthKey);
+    });
+    return Array.from(monthSet).sort().reverse();
+  };
 
   const value: ExpenseContextType = {
     budget,
@@ -166,6 +206,10 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
     totalSpent,
     remainingBalance,
     categoryWiseSummary,
+    getExpensesForMonth,
+    getMonthlySpent,
+    getMonthlyCategoryWiseSummary,
+    getAvailableMonths,
   };
 
   return <ExpenseContext.Provider value={value}>{children}</ExpenseContext.Provider>;

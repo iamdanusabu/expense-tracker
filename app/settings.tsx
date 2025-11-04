@@ -6,7 +6,7 @@ import { useExpenses } from '../contexts/ExpenseContext';
 /**
  * Settings Screen Component
  * Allows users to:
- * - Set/update monthly budget
+ * - Set/update total budget
  * - View all expenses with details
  * - Delete individual expenses
  */
@@ -69,20 +69,20 @@ export default function SettingsScreen() {
       {/* Budget Settings Card */}
       <Card style={styles.card}>
         <Card.Content>
-          <Title>Monthly Budget</Title>
+          <Title>Total Budget</Title>
           <Paragraph style={styles.description}>
-            Set your monthly budget to track your spending and see how much you have left.
+            Set your total budget to track your spending and see how much you have left.
           </Paragraph>
 
           {/* Budget Input */}
           <TextInput
-            label="Monthly Budget ($)"
+            label="Total Budget (₹)"
             value={budgetInput}
             onChangeText={setBudgetInput}
             keyboardType="decimal-pad"
             mode="outlined"
             style={styles.input}
-            left={<TextInput.Icon icon="currency-usd" />}
+            left={<TextInput.Icon icon="currency-inr" />}
           />
 
           {/* Update Button */}
@@ -97,7 +97,7 @@ export default function SettingsScreen() {
           {/* Current Budget Display */}
           {budget > 0 && (
             <Paragraph style={styles.currentBudget}>
-              Current budget: ${budget.toFixed(2)}
+              Current budget: ₹{budget.toFixed(2)}
             </Paragraph>
           )}
         </Card.Content>
@@ -116,7 +116,7 @@ export default function SettingsScreen() {
                   description={`${getCategoryName(expense.category)} - ${expense.date}`}
                   left={() => (
                     <Paragraph style={styles.expenseAmount}>
-                      ${expense.amount.toFixed(2)}
+                      ₹{expense.amount.toFixed(2)}
                     </Paragraph>
                   )}
                   right={() => (

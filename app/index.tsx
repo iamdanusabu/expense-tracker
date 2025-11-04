@@ -1,19 +1,38 @@
-import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { Card, Title, Paragraph, Button, List, FAB } from 'react-native-paper';
+import React, { useState } from 'react';
+import { View, ScrollView, StyleSheet, Modal } from 'react-native';
+import { Card, Title, Paragraph, Button, List, FAB, Chip, Portal, Dialog } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useExpenses } from '../contexts/ExpenseContext';
 
 /**
  * Home Screen Component
  * Displays:
- * - Budget overview (total, spent, remaining)
+ * - Month selector to view current or past months
+ * - Budget overview (total budget, spent, remaining)
  * - Category-wise expense summary
  * - Quick navigation buttons to other screens
  */
 export default function HomeScreen() {
   const router = useRouter();
-  const { budget, totalSpent, remainingBalance, categoryWiseSummary, categories } = useExpenses();
+  const { 
+    budget, 
+    totalSpent, 
+    remainingBalance, 
+    categoryWiseSummary,
+    categories,
+    getAvailableMonths,
+    getMonthlySpent,
+    getMonthlyCategoryWiseSummary,
+  } = useExpenses();
+
+  // Get available months
+  const availableMonths = getAvailableMonths();
+  
+  // State for selected view: 'total' or specific month 'YYYY-MM'
+  const [selectedView, setSelectedView] = useState<string>('total');
+  
+  // State for month selector dialog
+  const [showMonthSelector, setShowMonthSelector] = useState(false);
 
   // Determine if budget is set
   const hasBudget = budget > 0;
@@ -30,9 +49,52 @@ export default function HomeScreen() {
     return category ? category.color : '#ccc';
   };
 
+  // Calculate displayed values based on selected view
+  const displaySpent = selectedView === 'total' 
+    ? totalSpent 
+    : (() => {
+        const [year, month] = selectedView.split('-').map(Number);
+        return getMonthlySpent(year, month - 1);
+      })();
+
+  const displayCategorySummary = selectedView === 'total'
+    ? categoryWiseSummary
+    : (() => {
+        const [year, month] = selectedView.split('-').map(Number);
+        return getMonthlyCategoryWiseSummary(year, month - 1);
+      })();
+
+  const displayRemaining = budget - displaySpent;
+
+  // Format month for display
+  const formatMonthLabel = (monthKey: string) => {
+    if (monthKey === 'total') return 'All Time';
+    const [year, month] = monthKey.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1);
+    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  };
+
+  // Handle month selection
+  const handleMonthSelect = (month: string) => {
+    setSelectedView(month);
+    setShowMonthSelector(false);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
+        {/* Month Selector Chip */}
+        <View style={styles.chipContainer}>
+          <Chip 
+            icon="calendar" 
+            onPress={() => setShowMonthSelector(true)}
+            style={styles.chip}
+            mode="outlined"
+          >
+            {formatMonthLabel(selectedView)}
+          </Chip>
+        </View>
+
         {/* Budget Overview Card */}
         <Card style={styles.card}>
           <Card.Content>
@@ -40,13 +102,13 @@ export default function HomeScreen() {
             {hasBudget ? (
               <>
                 <View style={styles.budgetRow}>
-                  <Paragraph>Monthly Budget:</Paragraph>
-                  <Paragraph style={styles.amount}>${budget.toFixed(2)}</Paragraph>
+                  <Paragraph>Total Budget:</Paragraph>
+                  <Paragraph style={styles.amount}>₹{budget.toFixed(2)}</Paragraph>
                 </View>
                 <View style={styles.budgetRow}>
-                  <Paragraph>Total Spent:</Paragraph>
+                  <Paragraph>{selectedView === 'total' ? 'Total' : 'Month'} Spent:</Paragraph>
                   <Paragraph style={[styles.amount, styles.spent]}>
-                    ${totalSpent.toFixed(2)}
+                    ₹{displaySpent.toFixed(2)}
                   </Paragraph>
                 </View>
                 <View style={styles.budgetRow}>
@@ -54,15 +116,15 @@ export default function HomeScreen() {
                   <Paragraph 
                     style={[
                       styles.amount, 
-                      remainingBalance >= 0 ? styles.positive : styles.negative
+                      displayRemaining >= 0 ? styles.positive : styles.negative
                     ]}
                   >
-                    ${remainingBalance.toFixed(2)}
+                    ₹{displayRemaining.toFixed(2)}
                   </Paragraph>
                 </View>
               </>
             ) : (
-              <Paragraph>No budget set. Go to Settings to set your monthly budget.</Paragraph>
+              <Paragraph>No budget set. Go to Settings to set your total budget.</Paragraph>
             )}
           </Card.Content>
         </Card>
@@ -71,13 +133,13 @@ export default function HomeScreen() {
         <Card style={styles.card}>
           <Card.Content>
             <Title>Expenses by Category</Title>
-            {Object.keys(categoryWiseSummary).length > 0 ? (
+            {Object.keys(displayCategorySummary).length > 0 ? (
               <List.Section>
-                {Object.entries(categoryWiseSummary).map(([categoryId, amount]) => (
+                {Object.entries(displayCategorySummary).map(([categoryId, amount]) => (
                   <List.Item
                     key={categoryId}
                     title={getCategoryName(categoryId)}
-                    description={`$${amount.toFixed(2)}`}
+                    description={`₹${amount.toFixed(2)}`}
                     left={() => (
                       <View 
                         style={[
@@ -90,7 +152,11 @@ export default function HomeScreen() {
                 ))}
               </List.Section>
             ) : (
-              <Paragraph>No expenses yet. Tap the + button to add your first expense!</Paragraph>
+              <Paragraph>
+                {selectedView === 'total' 
+                  ? 'No expenses yet. Tap the + button to add your first expense!'
+                  : 'No expenses for this month.'}
+              </Paragraph>
             )}
           </Card.Content>
         </Card>
@@ -114,6 +180,39 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
+      {/* Month Selector Dialog */}
+      <Portal>
+        <Dialog visible={showMonthSelector} onDismiss={() => setShowMonthSelector(false)}>
+          <Dialog.Title>Select Time Period</Dialog.Title>
+          <Dialog.ScrollArea style={styles.dialogScroll}>
+            <ScrollView>
+              {/* All Time Option */}
+              <List.Item
+                title="All Time"
+                description="View total expenses"
+                onPress={() => handleMonthSelect('total')}
+                left={props => <List.Icon {...props} icon="calendar-multiselect" />}
+                right={props => selectedView === 'total' ? <List.Icon {...props} icon="check" color="#6200ee" /> : null}
+              />
+              
+              {/* Monthly Options */}
+              {availableMonths.map((month) => (
+                <List.Item
+                  key={month}
+                  title={formatMonthLabel(month)}
+                  onPress={() => handleMonthSelect(month)}
+                  left={props => <List.Icon {...props} icon="calendar-month" />}
+                  right={props => selectedView === month ? <List.Icon {...props} icon="check" color="#6200ee" /> : null}
+                />
+              ))}
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setShowMonthSelector(false)}>Close</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
       {/* Floating Action Button to add expense */}
       <FAB
         icon="plus"
@@ -133,9 +232,21 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  chipContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  chip: {
+    minWidth: 200,
+  },
   card: {
     margin: 16,
     marginBottom: 8,
+  },
+  dialogScroll: {
+    maxHeight: 400,
   },
   budgetRow: {
     flexDirection: 'row',
