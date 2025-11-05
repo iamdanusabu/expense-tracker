@@ -57,7 +57,6 @@ export default function AddExpenseScreen() {
 
   return (
     <View style={styles.container}>
-      <Header onSave={handleSave} />
       <ScrollView contentContainerStyle={styles.mainContent}>
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Amount</Text>
@@ -126,21 +125,6 @@ export default function AddExpenseScreen() {
     </View>
   );
 }
-
-const Header = ({ onSave }) => {
-    const router = useRouter();
-    return(
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-          <MaterialIcons name="arrow-back" size={24} color="#333333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Expense</Text>
-        <TouchableOpacity onPress={onSave} style={styles.saveButton}>
-          <Text style={styles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
-      </View>
-    )
-};
 
 const CategoryPickerModal = ({ visible, categories, onClose, onSelect }) => (
   <Modal visible={visible} transparent={true} animationType="slide">

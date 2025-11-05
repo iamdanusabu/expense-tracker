@@ -1,20 +1,23 @@
 
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Text, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Alert } from 'react-native';
+import { View, ScrollView, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useExpenses } from '../contexts/ExpenseContext';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 export default function SettingsScreen() {
-  const { budget, setBudget, expenses, deleteExpense, categories } = useExpenses();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const { budget, setBudget, expenses, deleteExpense, categories, totalSpent, allExpenses } = useExpenses(currentDate);
   const [budgetInput, setBudgetInput] = useState(budget.toString());
-  const [currentDate, setCurrentDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isStartDatePickerVisible, setStartDatePickerVisibility] = useState(false);
+  const [isEndDatePickerVisible, setEndDatePickerVisibility] = useState(false);
 
   useEffect(() => {
     setBudgetInput(budget.toString());
-    const date = new Date();
-    const month = date.toLocaleString('default', { month: 'long' });
-    const year = date.getFullYear();
-    setCurrentDate(`${month} ${year}`);
   }, [budget]);
 
   const handleUpdateBudget = () => {
@@ -50,7 +53,7 @@ export default function SettingsScreen() {
     return category ? category.name : 'Unknown';
   };
   
-    const getCategoryIcon = (categoryName) => {
+  const getCategoryIcon = (categoryName) => {
     const icons = {
       'Groceries': 'shopping-cart',
       'Transport': 'directions-bus',
@@ -63,13 +66,119 @@ export default function SettingsScreen() {
     return icons[categoryName] || 'receipt-long'; // default icon
   };
 
-  const totalSpent = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const handleExport = async () => {
+    if (!startDate || !endDate) {
+      Alert.alert('Missing Dates', 'Please enter both a start and end date.');
+      return;
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        Alert.alert('Invalid Dates', 'Please enter valid dates in YYYY-MM-DD format.');
+        return;
+    }
+
+    end.setHours(23, 59, 59, 999);
+
+    const filteredExpenses = allExpenses.filter(expense => {
+        const expenseDate = new Date(expense.date);
+        return expenseDate >= start && expenseDate <= end;
+    });
+
+    if (filteredExpenses.length === 0) {
+        Alert.alert('No Data', 'No expenses found in the selected date range.');
+        return;
+    }
+
+    const totalSpentInRange = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+    const categoryWiseSummaryInRange = filteredExpenses.reduce((acc, expense) => {
+        const categoryName = getCategoryName(expense.category);
+        if (!acc[categoryName]) {
+            acc[categoryName] = 0;
+        }
+        acc[categoryName] += expense.amount;
+        return acc;
+    }, {});
+
+
+    let csvContent = "";
+    
+    csvContent += "Type,Value\n";
+    csvContent += `Budget for Period,${budget}\n`;
+    csvContent += `Total Spent,${totalSpentInRange.toFixed(2)}\n\n`;
+    
+    csvContent += "Category,Amount Spent\n";
+    for (const category in categoryWiseSummaryInRange) {
+        csvContent += `${category},${categoryWiseSummaryInRange[category].toFixed(2)}\n`;
+    }
+    csvContent += "\n";
+
+    csvContent += "Date,Description,Category,Amount\n";
+    filteredExpenses.forEach(expense => {
+        const categoryName = getCategoryName(expense.category);
+        csvContent += `${new Date(expense.date).toISOString().split('T')[0]},"${expense.description}",${categoryName},${expense.amount.toFixed(2)}\n`;
+    });
+
+    try {
+        if (Platform.OS === 'web') {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', 'expenses.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            const uri = FileSystem.cacheDirectory + 'expenses.csv';
+            await FileSystem.writeAsStringAsync(uri, csvContent, {
+                encoding: 'utf8',
+            });
+            await Sharing.shareAsync(uri, {
+                mimeType: 'text/csv',
+                dialogTitle: 'Export Expense Data',
+            });
+        }
+    } catch (error) {
+        console.error('Export failed:', error);
+        Alert.alert('Export Failed', 'Could not save or share the file.');
+    }
+  };
+
+  const showDatePicker = (type) => {
+    if (type === 'start') {
+      setStartDatePickerVisibility(true);
+    } else {
+      setEndDatePickerVisibility(true);
+    }
+  };
+
+  const hideDatePicker = (type) => {
+    if (type === 'start') {
+      setStartDatePickerVisibility(false);
+    } else {
+      setEndDatePickerVisibility(false);
+    }
+  };
+
+  const handleConfirm = (date, type) => {
+    const formattedDate = date.toISOString().split('T')[0];
+    if (type === 'start') {
+      setStartDate(formattedDate);
+    } else {
+      setEndDate(formattedDate);
+    }
+    hideDatePicker(type);
+  };
+
   const budgetSpentPercentage = budget > 0 ? (totalSpent / budget) * 100 : 0;
 
   return (
     <View style={styles.container}>
         <View style={styles.header}>
-            <Text style={styles.headerTitle}>{currentDate}</Text>
+            <Text style={styles.headerTitle}>{currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</Text>
         </View>
       <ScrollView style={styles.mainContent}>
         <View style={styles.budgetCard}>
@@ -84,7 +193,7 @@ export default function SettingsScreen() {
             </View>
           </View>
           <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 10}}>
-            <RNTextInput
+            <TextInput
               style={styles.input}
               value={budgetInput}
               onChangeText={setBudgetInput}
@@ -96,6 +205,42 @@ export default function SettingsScreen() {
                 <Text style={styles.editButtonText}>Edit Budget</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        <View style={styles.exportCard}>
+          <Text style={styles.cardTitle}>Export Data</Text>
+          {Platform.OS === 'web' ? (
+            <View style={styles.dateRangeContainer}>
+                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={styles.webDateInput} />
+                <Text style={styles.dateRangeSeparator}>to</Text>
+                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={styles.webDateInput} />
+            </View>
+          ) : (
+            <View style={styles.dateRangeContainer}>
+                <TouchableOpacity onPress={() => showDatePicker('start')} style={styles.dateInput}>
+                    <Text style={styles.dateText}>{startDate || 'YYYY-MM-DD'}</Text>
+                </TouchableOpacity>
+                <Text style={styles.dateRangeSeparator}>to</Text>
+                <TouchableOpacity onPress={() => showDatePicker('end')} style={styles.dateInput}>
+                    <Text style={styles.dateText}>{endDate || 'YYYY-MM-DD'}</Text>
+                </TouchableOpacity>
+            </View>
+          )}
+          <DateTimePickerModal
+            isVisible={isStartDatePickerVisible}
+            mode="date"
+            onConfirm={(date) => handleConfirm(date, 'start')}
+            onCancel={() => hideDatePicker('start')}
+          />
+          <DateTimePickerModal
+            isVisible={isEndDatePickerVisible}
+            mode="date"
+            onConfirm={(date) => handleConfirm(date, 'end')}
+            onCancel={() => hideDatePicker('end')}
+          />
+          <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+              <Text style={styles.exportButtonText}>Export CSV</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.transactionsTitle}>All Transactions</Text>
@@ -206,6 +351,61 @@ const styles = StyleSheet.create({
     editButtonText: {
         color: '#2ECC71',
         fontSize: 14,
+        fontFamily: 'Inter-Bold',
+    },
+    exportCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
+        marginBottom: 24,
+    },
+    dateRangeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    dateInput: {
+        flex: 1,
+        height: 40,
+        borderColor: 'gray',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        fontFamily: 'Inter-Regular',
+        justifyContent: 'center',
+    },
+    webDateInput: {
+        flex: 1,
+        height: 40,
+        borderColor: 'gray',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        fontFamily: 'Inter-Regular',
+    },
+    dateText: {
+        fontSize: 16,
+        fontFamily: 'Inter-Regular',
+    },
+    dateRangeSeparator: {
+        marginHorizontal: 10,
+        fontFamily: 'Inter-Regular',
+        color: '#8E8E93',
+    },
+    exportButton: {
+        backgroundColor: '#2ECC71',
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    exportButtonText: {
+        color: '#FFFFFF',
         fontFamily: 'Inter-Bold',
     },
     transactionsTitle: {

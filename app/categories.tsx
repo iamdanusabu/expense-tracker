@@ -80,7 +80,6 @@ export default function CategoriesScreen() {
 
   return (
     <View style={styles.container}>
-      <Header />
       <ScrollView style={styles.mainContent}>
         {categories.map((cat) => (
           <CategoryItem 
@@ -110,16 +109,6 @@ export default function CategoriesScreen() {
     </View>
   );
 }
-
-const Header = () => (
-  <View style={styles.header}>
-    <TouchableOpacity>
-      <MaterialIcons name="arrow-back" size={24} color="#333333" />
-    </TouchableOpacity>
-    <Text style={styles.headerTitle}>Manage Categories</Text>
-    <View style={{ width: 24 }} />
-  </View>
-);
 
 const CategoryItem = ({ category, onEdit, onDelete }) => (
   <View style={styles.itemContainer}>

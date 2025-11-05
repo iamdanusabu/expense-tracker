@@ -1,24 +1,54 @@
 
-import React from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useExpenses } from '../contexts/ExpenseContext';
+import { useExpenses, Expense } from '../contexts/ExpenseContext';
 import { MaterialIcons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [modalVisible, setModalVisible] = useState(false);
+  const [todaysSpends, setTodaysSpends] = useState<Expense[] | null>(null);
+
   const {
     budget,
     totalSpent,
     categories,
     categoryWiseSummary,
-  } = useExpenses();
+    allExpenses, // Use allExpenses for today's spends calculation
+  } = useExpenses(currentDate);
 
   const remainingBalance = (budget || 0) - (totalSpent || 0);
   const totalSpentPercentage = (budget || 0) > 0 ? ((totalSpent || 0) / (budget || 0)) * 100 : 0;
 
-  const getCategoryIcon = (categoryName) => {
-    const icons = {
+  const getTodaysSpends = () => {
+    const today = new Date();
+    return allExpenses.filter(expense => {
+      const expenseDate = new Date(expense.date);
+      return (
+        expenseDate.getDate() === today.getDate() &&
+        expenseDate.getMonth() === today.getMonth() &&
+        expenseDate.getFullYear() === today.getFullYear()
+      );
+    });
+  };
+
+  const todaysSpendsArray = getTodaysSpends();
+  const totalTodaysSpends = todaysSpendsArray.reduce((sum, expense) => sum + expense.amount, 0);
+
+  const handleViewTodaysSpends = () => {
+    setTodaysSpends(todaysSpendsArray);
+    setModalVisible(true);
+  };
+
+  const handleCloseModal = () => {
+      setModalVisible(false);
+      // We will not setTodaysSpends to null immediately to allow for the fade out animation
+  }
+
+  const getCategoryIcon = (categoryName: string) => {
+    const icons: { [key: string]: string } = {
       'Groceries': 'shopping-cart',
       'Transport': 'directions-bus',
       'Entertainment': 'movie',
@@ -42,9 +72,21 @@ export default function HomeScreen() {
     };
   });
 
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
   return (
     <View style={styles.container}>
-      <Header />
+      <Header 
+        currentDate={currentDate}
+        onPrevMonth={handlePrevMonth}
+        onNextMonth={handleNextMonth}
+      />
       <ScrollView style={styles.main}>
         <BudgetSummary
           remaining={remainingBalance}
@@ -52,21 +94,34 @@ export default function HomeScreen() {
           spent={totalSpent}
           spentPercentage={totalSpentPercentage}
         />
+        <TouchableOpacity style={styles.todaysSpendsButton} onPress={handleViewTodaysSpends}>
+            <Text style={styles.todaysSpendsButtonText}>Today's Spends: ₹{totalTodaysSpends.toFixed(2)}</Text>
+        </TouchableOpacity>
         <CategorySpending summary={displayCategorySummary} />
       </ScrollView>
       <BottomNav />
+      <TodaysSpendsModal 
+        visible={modalVisible} 
+        onClose={handleCloseModal} 
+        expenses={todaysSpends || []} // Pass the state to the modal
+        categories={categories}
+        getCategoryIcon={getCategoryIcon}
+        onAnimationEnd={() => !modalVisible && setTodaysSpends(null)} // Clear data after animation
+      />
     </View>
   );
 }
 
-const Header = () => (
+const Header = ({ currentDate, onPrevMonth, onNextMonth }: { currentDate: Date, onPrevMonth: () => void, onNextMonth: () => void }) => (
   <View style={styles.header}>
-    <TouchableOpacity style={styles.headerIconContainer}>
-      <MaterialIcons name="menu" size={24} style={styles.icon} />
+    <TouchableOpacity onPress={onPrevMonth} style={styles.headerIconContainer}>
+      <MaterialIcons name="chevron-left" size={24} style={styles.icon} />
     </TouchableOpacity>
-    <Text style={styles.headerTitle}>Monthly Overview</Text>
-    <TouchableOpacity style={styles.headerIconContainer}>
-      <MaterialIcons name="calendar-today" size={24} style={styles.icon} />
+    <Text style={styles.headerTitle}>
+      {currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+    </Text>
+    <TouchableOpacity onPress={onNextMonth} style={styles.headerIconContainer}>
+      <MaterialIcons name="chevron-right" size={24} style={styles.icon} />
     </TouchableOpacity>
   </View>
 );
@@ -87,7 +142,7 @@ const BudgetSummary = ({ remaining = 0, budget = 0, spent = 0, spentPercentage =
   </View>
 );
 
-const CategorySpending = ({ summary }) => (
+const CategorySpending = ({ summary }: { summary: any[] }) => (
   <View>
     <View style={styles.categoryHeader}>
       <Text style={styles.categoryTitle}>Spending by Category</Text>
@@ -103,7 +158,7 @@ const CategorySpending = ({ summary }) => (
   </View>
 );
 
-const CategoryItem = ({ item }) => {
+const CategoryItem = ({ item }: { item: any }) => {
   const spent = item.spent || 0;
   const budget = item.budget || 0;
   const spentPercentage = budget > 0 ? (spent / budget) * 100 : 0;
@@ -111,7 +166,7 @@ const CategoryItem = ({ item }) => {
   return (
     <View style={styles.categoryItemCard}>
       <View style={[styles.categoryIconContainer, { backgroundColor: `${item.color}20` }]}>
-        <MaterialIcons name={item.icon} size={24} color={item.color} />
+        <MaterialIcons name={item.icon as any} size={24} color={item.color} />
       </View>
       <View style={styles.categoryInfo}>
         <View style={styles.categoryRow}>
@@ -125,6 +180,45 @@ const CategoryItem = ({ item }) => {
         </View>
       </View>
     </View>
+  );
+};
+
+const TodaysSpendsModal = ({ visible, onClose, expenses, categories, getCategoryIcon, onAnimationEnd }: any) => {
+  const totalTodaysSpends = expenses.reduce((sum: number, expense: Expense) => sum + expense.amount, 0);
+
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find((cat: any) => cat.id === categoryId);
+    return category ? category.name : 'Unknown';
+  };
+
+  return (
+    <Modal visible={visible} transparent={true} animationType="fade" onShow={onAnimationEnd} onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} onPress={onClose} activeOpacity={1}>
+        <TouchableWithoutFeedback>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Today's Spends</Text>
+            <Text style={styles.modalTotal}>Total: ₹{totalTodaysSpends.toFixed(2)}</Text>
+            <ScrollView>
+              {expenses.map((expense: Expense) => {
+                const categoryName = getCategoryName(expense.category);
+                return (
+                  <View key={expense.id} style={styles.transactionItem}>
+                    <View style={[styles.transactionIconContainer, { backgroundColor: '#E8F5E9'}]}>
+                      <MaterialIcons name={getCategoryIcon(categoryName) as any} size={24} color="#4CAF50" />
+                    </View>
+                    <View style={styles.transactionDetails}>
+                      <Text style={styles.transactionDescription}>{expense.description}</Text>
+                      <Text style={styles.transactionCategory}>{categoryName}</Text>
+                    </View>
+                    <Text style={styles.transactionAmount}>-₹{expense.amount.toFixed(2)}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
+      </TouchableOpacity>
+    </Modal>
   );
 };
 
@@ -239,6 +333,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#13ec13', // primary
   },
+  todaysSpendsButton: {
+      backgroundColor: '#13ec13',
+      padding: 15,
+      borderRadius: 10,
+      alignItems: 'center',
+      marginBottom: 20,
+  },
+  todaysSpendsButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontFamily: 'Inter-Bold',
+  },
   categoryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -336,5 +442,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-SemiBold',
     color: '#13ec13', // primary
+  },
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, width: '80%', maxHeight: '50%' },
+  modalTitle: { fontSize: 20, fontFamily: 'Inter-Bold', marginBottom: 16, textAlign: 'center' },
+  modalTotal: { fontSize: 18, fontFamily: 'Inter-SemiBold', marginBottom: 16, textAlign: 'center', color: '#13ec13' },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff', // card-light
+    borderRadius: 8,
+    padding: 16,
+    gap: 16,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  transactionIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transactionDetails: {
+    flex: 1,
+  },
+  transactionDescription: {
+    fontFamily: 'Inter-SemiBold',
+    color: '#0d1b0d',
+  },
+  transactionCategory: {
+    fontFamily: 'Inter-Regular',
+    color: '#435943',
+    fontSize: 12,
+  },
+  transactionAmount: {
+    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    color: '#0d1b0d',
   },
 });
