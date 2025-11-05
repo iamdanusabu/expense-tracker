@@ -2,13 +2,23 @@ import { Stack } from "expo-router";
 import { PaperProvider } from 'react-native-paper';
 import { ExpenseProvider } from '../contexts/ExpenseContext';
 import { useFonts } from 'expo-font';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
+import { useEffect } from 'react';
+import * as Notifications from 'expo-notifications';
+import { startNotificationListener, setupNotificationTapListener } from '../services/NotificationService';
+
+// Configure the notification handler for how notifications should appear
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 /**
  * Root Layout Component
- * Wraps the entire app with:
- * 1. ExpenseProvider - for global state management
- * 2. PaperProvider - for React Native Paper UI components
+ * Wraps the entire app with necessary providers and sets up global listeners.
  */
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -18,6 +28,27 @@ export default function RootLayout() {
     'Inter-Bold': require('../assets/fonts/Inter-Bold.otf'),
     'Inter-ExtraBold': require('../assets/fonts/Inter-ExtraBold.otf'),
   });
+
+  useEffect(() => {
+    // Request notification permissions for showing our own local notifications
+    const requestPermissions = async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        alert('You need to enable notifications for the app to suggest expenses.');
+      }
+    };
+
+    requestPermissions();
+
+    // Start the SMS notification listener (Android only)
+    if (Platform.OS === 'android') {
+      startNotificationListener();
+    }
+    
+    // Set up the listener for handling taps on our app's notifications
+    setupNotificationTapListener();
+
+  }, []);
 
   if (!fontsLoaded) {
     return (
@@ -33,14 +64,14 @@ export default function RootLayout() {
         <Stack
           screenOptions={{
             headerStyle: {
-              backgroundColor: '#f6f8f6', // background-light
+              backgroundColor: '#f6f8f6',
             },
-            headerTintColor: '#0d1b0d', // text-light-primary
+            headerTintColor: '#0d1b0d',
             headerTitleStyle: {
               fontFamily: 'Inter-Bold',
             },
             contentStyle: {
-              backgroundColor: '#f6f8f6', // background-light
+              backgroundColor: '#f6f8f6',
             },
           }}
         >

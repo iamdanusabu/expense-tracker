@@ -1,8 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useExpenses } from '../contexts/ExpenseContext';
 
 // Mocks for category icons - replace with your actual logic
@@ -23,12 +23,19 @@ const getCategoryIcon = (categoryName) => {
 export default function AddExpenseScreen() {
   const router = useRouter();
   const { categories, addExpense } = useExpenses();
+  const { amount: amountFromParams } = useLocalSearchParams();
 
   const [amount, setAmount] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || null);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (amountFromParams) {
+      setAmount(amountFromParams as string);
+    }
+  }, [amountFromParams]);
 
   const handleSave = () => {
     const parsedAmount = parseFloat(amount);
