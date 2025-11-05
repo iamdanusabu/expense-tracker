@@ -1,322 +1,340 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
-import { Card, Title, Paragraph, Button, List, FAB, Chip, Portal, Dialog } from 'react-native-paper';
+
+import React from 'react';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useExpenses } from '../contexts/ExpenseContext';
+import { MaterialIcons } from '@expo/vector-icons';
 
-/**
- * Home Screen Component
- * Displays:
- * - Month selector to view current or past months
- * - Budget overview (total budget, spent, remaining)
- * - Category-wise expense summary
- * - Quick navigation buttons to other screens
- */
 export default function HomeScreen() {
   const router = useRouter();
-  const { 
-    budget, 
-    totalSpent, 
-    remainingBalance, 
-    categoryWiseSummary,
+  const {
+    budget,
+    totalSpent,
     categories,
-    expenses,
-    getAvailableMonths,
-    getMonthlySpent,
-    getMonthlyCategoryWiseSummary,
+    categoryWiseSummary,
   } = useExpenses();
 
-  // Get available months
-  const availableMonths = getAvailableMonths();
-  
-  // State for selected view: 'total' or specific month 'YYYY-MM'
-  const [selectedView, setSelectedView] = useState<string>('total');
-  
-  // State for month selector dialog
-  const [showMonthSelector, setShowMonthSelector] = useState(false);
-  
-  // State for pull-to-refresh
-  const [refreshing, setRefreshing] = useState(false);
+  const remainingBalance = (budget || 0) - (totalSpent || 0);
+  const totalSpentPercentage = (budget || 0) > 0 ? ((totalSpent || 0) / (budget || 0)) * 100 : 0;
 
-  // Log values for debugging
-  useEffect(() => {
-    console.log('Home Screen - Budget:', budget);
-    console.log('Home Screen - Total Spent:', totalSpent);
-    console.log('Home Screen - Expenses count:', expenses.length);
-  }, [budget, totalSpent, expenses]);
-
-  // Determine if budget is set
-  const hasBudget = budget > 0;
-  
-  // Handle refresh
-  const onRefresh = () => {
-    setRefreshing(true);
-    // Force re-render by toggling a state
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 500);
+  const getCategoryIcon = (categoryName) => {
+    const icons = {
+      'Groceries': 'shopping-cart',
+      'Transport': 'directions-bus',
+      'Entertainment': 'movie',
+      'Utilities': 'receipt',
+      'Food': 'fastfood',
+      'Shopping': 'shopping-bag',
+      'Bills': 'receipt-long',
+    };
+    return icons[categoryName] || 'receipt-long'; // default icon
   };
 
-  // Get category name by ID
-  const getCategoryName = (categoryId: string) => {
-    const category = categories.find(cat => cat.id === categoryId);
-    return category ? category.name : 'Unknown';
-  };
-
-  // Get category color by ID
-  const getCategoryColor = (categoryId: string) => {
-    const category = categories.find(cat => cat.id === categoryId);
-    return category ? category.color : '#ccc';
-  };
-
-  // Calculate displayed values based on selected view
-  const displaySpent = selectedView === 'total' 
-    ? totalSpent 
-    : (() => {
-        const [year, month] = selectedView.split('-').map(Number);
-        return getMonthlySpent(year, month - 1);
-      })();
-
-  const displayCategorySummary = selectedView === 'total'
-    ? categoryWiseSummary
-    : (() => {
-        const [year, month] = selectedView.split('-').map(Number);
-        return getMonthlyCategoryWiseSummary(year, month - 1);
-      })();
-
-  const displayRemaining = budget - displaySpent;
-
-  // Format month for display
-  const formatMonthLabel = (monthKey: string) => {
-    if (monthKey === 'total') return 'All Time';
-    const [year, month] = monthKey.split('-');
-    const date = new Date(parseInt(year), parseInt(month) - 1);
-    return date.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-  };
-
-  // Handle month selection
-  const handleMonthSelect = (month: string) => {
-    setSelectedView(month);
-    setShowMonthSelector(false);
-  };
+  const displayCategorySummary = categories.map(category => {
+    const summary = categoryWiseSummary[category.id] || { spent: 0, budget: category.budget || 0 };
+    return {
+      id: category.id,
+      name: category.name,
+      spent: summary.spent,
+      budget: summary.budget,
+      color: category.color,
+      icon: getCategoryIcon(category.name),
+    };
+  });
 
   return (
     <View style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        {/* Month Selector Chip */}
-        <View style={styles.chipContainer}>
-          <Chip 
-            icon="calendar" 
-            onPress={() => setShowMonthSelector(true)}
-            style={styles.chip}
-            mode="outlined"
-          >
-            {formatMonthLabel(selectedView)}
-          </Chip>
-        </View>
-
-        {/* Budget Overview Card */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Title>Budget Overview</Title>
-            {hasBudget ? (
-              <>
-                <View style={styles.budgetRow}>
-                  <Paragraph>Total Budget:</Paragraph>
-                  <Paragraph style={styles.amount}>₹{budget.toFixed(2)}</Paragraph>
-                </View>
-                <View style={styles.budgetRow}>
-                  <Paragraph>{selectedView === 'total' ? 'Total' : 'Month'} Spent:</Paragraph>
-                  <Paragraph style={[styles.amount, styles.spent]}>
-                    ₹{displaySpent.toFixed(2)}
-                  </Paragraph>
-                </View>
-                <View style={styles.budgetRow}>
-                  <Paragraph>Remaining:</Paragraph>
-                  <Paragraph 
-                    style={[
-                      styles.amount, 
-                      displayRemaining >= 0 ? styles.positive : styles.negative
-                    ]}
-                  >
-                    ₹{displayRemaining.toFixed(2)}
-                  </Paragraph>
-                </View>
-              </>
-            ) : (
-              <Paragraph>No budget set. Go to Settings to set your total budget.</Paragraph>
-            )}
-          </Card.Content>
-        </Card>
-
-        {/* Category-wise Summary Card */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Title>Category Budgets & Expenses</Title>
-            {Object.keys(displayCategorySummary).length > 0 ? (
-              <List.Section>
-                {Object.entries(displayCategorySummary).map(([categoryId, summary]) => (
-                  <List.Item
-                    key={categoryId}
-                    title={getCategoryName(categoryId)}
-                    description={`Spent: ₹${(summary.spent || 0).toFixed(2)}${summary.budget ? ` / Budget: ₹${summary.budget.toFixed(2)}` : ''}`}
-                    right={() => (
-                      summary.remaining !== undefined ? (
-                        <Paragraph style={summary.remaining >= 0 ? styles.positive : styles.negative}>
-                          {`₹${summary.remaining.toFixed(2)}`}
-                        </Paragraph>
-                      ) : null
-                    )}
-                    left={() => (
-                      <View 
-                        style={[
-                          styles.categoryIndicator, 
-                          { backgroundColor: getCategoryColor(categoryId) }
-                        ]} 
-                      />
-                    )}
-                  />
-                ))}
-              </List.Section>
-            ) : (
-              <Paragraph>
-                {selectedView === 'total' 
-                  ? 'No expenses yet. Tap the + button to add your first expense!'
-                  : 'No expenses for this month.'}
-              </Paragraph>
-            )}
-          </Card.Content>
-        </Card>
-
-        {/* Quick Action Buttons */}
-        <View style={styles.buttonContainer}>
-          <Button 
-            mode="outlined" 
-            onPress={() => router.push('/categories')}
-            style={styles.button}
-          >
-            Manage Categories
-          </Button>
-          <Button 
-            mode="outlined" 
-            onPress={() => router.push('/settings')}
-            style={styles.button}
-          >
-            Settings
-          </Button>
-        </View>
+      <Header />
+      <ScrollView style={styles.main}>
+        <BudgetSummary
+          remaining={remainingBalance}
+          budget={budget}
+          spent={totalSpent}
+          spentPercentage={totalSpentPercentage}
+        />
+        <CategorySpending summary={displayCategorySummary} />
       </ScrollView>
-
-      {/* Month Selector Dialog */}
-      <Portal>
-        <Dialog visible={showMonthSelector} onDismiss={() => setShowMonthSelector(false)}>
-          <Dialog.Title>Select Time Period</Dialog.Title>
-          <Dialog.ScrollArea style={styles.dialogScroll}>
-            <ScrollView>
-              {/* All Time Option */}
-              <List.Item
-                title="All Time"
-                description="View total expenses"
-                onPress={() => handleMonthSelect('total')}
-                left={props => <List.Icon {...props} icon="calendar-multiselect" />}
-                right={props => selectedView === 'total' ? <List.Icon {...props} icon="check" color="#6200ee" /> : null}
-              />
-              
-              {/* Monthly Options */}
-              {availableMonths.map((month) => (
-                <List.Item
-                  key={month}
-                  title={formatMonthLabel(month)}
-                  onPress={() => handleMonthSelect(month)}
-                  left={props => <List.Icon {...props} icon="calendar-month" />}
-                  right={props => selectedView === month ? <List.Icon {...props} icon="check" color="#6200ee" /> : null}
-                />
-              ))}
-            </ScrollView>
-          </Dialog.ScrollArea>
-          <Dialog.Actions>
-            <Button onPress={() => setShowMonthSelector(false)}>Close</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-
-      {/* Floating Action Button to add expense */}
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={() => router.push('/add-expense')}
-        label="Add Expense"
-      />
+      <BottomNav />
     </View>
   );
 }
 
+const Header = () => (
+  <View style={styles.header}>
+    <TouchableOpacity style={styles.headerIconContainer}>
+      <MaterialIcons name="menu" size={24} style={styles.icon} />
+    </TouchableOpacity>
+    <Text style={styles.headerTitle}>Monthly Overview</Text>
+    <TouchableOpacity style={styles.headerIconContainer}>
+      <MaterialIcons name="calendar-today" size={24} style={styles.icon} />
+    </TouchableOpacity>
+  </View>
+);
+
+const BudgetSummary = ({ remaining = 0, budget = 0, spent = 0, spentPercentage = 0 }) => (
+  <View style={styles.budgetSummaryCard}>
+    <Text style={styles.remainingText}>₹{remaining.toFixed(2)} Remaining</Text>
+    <Text style={styles.budgetText}>out of ₹{budget.toFixed(2)} budget</Text>
+    <View style={styles.progressContainer}>
+      <View style={styles.totalSpentRow}>
+        <Text style={styles.totalSpentLabel}>Total Spent</Text>
+        <Text style={styles.totalSpentValue}>₹{spent.toFixed(2)}</Text>
+      </View>
+      <View style={styles.progressBarBackground}>
+        <View style={[styles.progressBar, { width: `${spentPercentage}%` }]} />
+      </View>
+    </View>
+  </View>
+);
+
+const CategorySpending = ({ summary }) => (
+  <View>
+    <View style={styles.categoryHeader}>
+      <Text style={styles.categoryTitle}>Spending by Category</Text>
+      <TouchableOpacity>
+        <Text style={styles.viewAllText}>View All</Text>
+      </TouchableOpacity>
+    </View>
+    <View style={styles.categoryList}>
+      {summary.map((item) => (
+        <CategoryItem key={item.id} item={item} />
+      ))}
+    </View>
+  </View>
+);
+
+const CategoryItem = ({ item }) => {
+  const spent = item.spent || 0;
+  const budget = item.budget || 0;
+  const spentPercentage = budget > 0 ? (spent / budget) * 100 : 0;
+
+  return (
+    <View style={styles.categoryItemCard}>
+      <View style={[styles.categoryIconContainer, { backgroundColor: `${item.color}20` }]}>
+        <MaterialIcons name={item.icon} size={24} color={item.color} />
+      </View>
+      <View style={styles.categoryInfo}>
+        <View style={styles.categoryRow}>
+          <Text style={styles.categoryName}>{item.name}</Text>
+          <Text style={styles.categoryAmount}>
+            ₹{spent.toFixed(2)} <Text style={styles.categoryBudget}>/ ₹{budget.toFixed(2)}</Text>
+          </Text>
+        </View>
+        <View style={styles.categoryProgressBarBackground}>
+          <View style={[styles.categoryProgressBar, { width: `${spentPercentage}%`, backgroundColor: item.color }]} />
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const BottomNav = () => {
+    const router = useRouter();
+    return(
+        <View style={styles.nav}>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/')}>
+            <MaterialIcons name="home" size={24} style={styles.navIconActive} />
+            <Text style={styles.navTextActive}>Home</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/add-expense')}>
+            <MaterialIcons name="add-shopping-cart" size={24} style={styles.navIcon} />
+            <Text style={styles.navText}>Add Expense</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/categories')}>
+            <MaterialIcons name="category" size={24} style={styles.navIcon} />
+            <Text style={styles.navText}>Add Category</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => router.push('/settings')}>
+            <MaterialIcons name="settings" size={24} style={styles.navIcon} />
+            <Text style={styles.navText}>Settings</Text>
+            </TouchableOpacity>
+        </View>
+    )
+};
+
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f6f8f6', // background-light
+    fontFamily: 'Inter-Bold',
   },
-  scrollView: {
-    flex: 1,
-  },
-  chipContainer: {
+  header: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 40, // Adjust for status bar
+    paddingBottom: 12,
+    backgroundColor: 'rgba(246, 248, 246, 0.8)', // background-light with opacity
+  },
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  icon: {
+    color: '#0d1b0d', // text-light-primary
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontFamily: 'Inter-Bold',
+    color: '#0d1b0d', // text-light-primary
+  },
+  main: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  budgetSummaryCard: {
+    backgroundColor: '#ffffff', // card-light
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  remainingText: {
+    fontSize: 30,
+    fontFamily: 'Inter-ExtraBold',
+    color: '#0d1b0d', // text-light-primary
+  },
+  budgetText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#435943', // text-light-secondary
+    paddingTop: 4,
+  },
+  progressContainer: {
     marginTop: 16,
-    marginBottom: 8,
   },
-  chip: {
-    minWidth: 200,
-  },
-  card: {
-    margin: 16,
-    marginBottom: 8,
-  },
-  dialogScroll: {
-    maxHeight: 400,
-  },
-  budgetRow: {
+  totalSpentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 4,
+    marginBottom: 8,
   },
-  amount: {
-    fontWeight: 'bold',
-    fontSize: 16,
+  totalSpentLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#0d1b0d', // text-light-primary
   },
-  spent: {
-    color: '#f57c00',
+  totalSpentValue: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#0d1b0d', // text-light-primary
   },
-  positive: {
-    color: '#2e7d32',
+  progressBarBackground: {
+    height: 8,
+    backgroundColor: 'rgba(19, 236, 19, 0.2)', // primary with 20% opacity
+    borderRadius: 4,
+    overflow: 'hidden',
   },
-  negative: {
-    color: '#c62828',
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#13ec13', // primary
   },
-  categoryIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginTop: 8,
-    marginRight: 8,
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  buttonContainer: {
-    margin: 16,
-    marginTop: 8,
+  categoryTitle: {
+    fontSize: 22,
+    fontFamily: 'Inter-Bold',
+    color: '#0d1b0d', // text-light-primary
   },
-  button: {
-    marginVertical: 4,
+  viewAllText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#13ec13', // primary
   },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#6200ee',
+  categoryList: {
+    gap: 12,
+  },
+  categoryItemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff', // card-light
+    borderRadius: 8,
+    padding: 16,
+    gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  categoryIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryInfo: {
+    flex: 1,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  categoryName: {
+    fontFamily: 'Inter-SemiBold',
+    color: '#0d1b0d', // text-light-primary
+  },
+  categoryAmount: {
+    fontFamily: 'Inter-Medium',
+    color: '#0d1b0d', // text-light-primary
+  },
+  categoryBudget: {
+    fontFamily: 'Inter-Regular',
+    color: '#435943', // text-light-secondary
+  },
+  categoryProgressBarBackground: {
+    height: 6,
+    backgroundColor: 'rgba(19, 236, 19, 0.2)', // primary with 20% opacity
+    borderRadius: 3,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  categoryProgressBar: {
+    height: 6,
+    borderRadius: 3,
+  },
+  nav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e6e0', // border-light
+    backgroundColor: 'rgba(246, 248, 246, 0.8)', // background-light with opacity
+    paddingTop: 8,
+    paddingBottom: 24, // For home indicator
+  },
+  navItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  navIcon: {
+    color: '#435943', // text-light-secondary
+  },
+  navIconActive: {
+    color: '#13ec13', // primary
+  },
+  navText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: '#435943', // text-light-secondary
+  },
+  navTextActive: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: '#13ec13', // primary
   },
 });
