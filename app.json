@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "expo-on-replit",
+    "name": "Expense Tracker",
     "slug": "expo-on-replit",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.danusabu.expensetrackerv2"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +39,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6e93c269-f398-4afb-9cca-8ef2d2a2d7bb"
+      }
     }
   }
 }
